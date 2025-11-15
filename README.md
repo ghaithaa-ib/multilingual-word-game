@@ -78,8 +78,4 @@ Name: [Ghaithaa]
 
 GitHub: @ghaithaa-ib
 
-Email: your.email@example.com (optional)
-
-License
-MIT License – Feel free to use, modify, and distribute the code.
 

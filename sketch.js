@@ -7,53 +7,48 @@ let timerInterval;
 let gameActive = false;
 let currentDirection = "en-ru";
 
-// عناصر DOM
+// DOM elements
 let timerElement, scoreElement, wordDisplayElement, optionsContainerElement;
 let startButton, leaderboardButton, leaderboardBody;
 let clearLeaderboardButton, backToGameButton, playerNameInput;
 
 function preload() {
-  table = loadTable('words.csv', 'csv', 'header');
+  try {
+    // Try loading file with error handling
+    table = loadTable('words.csv', 'csv', 'header');
+  } catch (error) {
+    console.warn('Cannot load file, using default data:', error);
+    table = null;
+  }
 }
 
 function setup() {
   noCanvas();
-
-  if (!table || table.getRowCount() === 0) {
-    alert('خطأ: ملف words.csv غير موجود أو فارغ!');
-    return;
-  }
-
-  // تحويل البيانات إلى أزواج
-  for (let r of table.getRows()) {
-    if (!r || typeof r.getString !== 'function') continue;
-
-    const src = r.getString('source_lang')?.trim();
-    const tgt = r.getString('target_lang')?.trim();
-    const srcTxt = r.getString('source_text')?.trim();
-    const tgtTxt = r.getString('target_text')?.trim();
-
-    if (!src || !tgt || !srcTxt || !tgtTxt) continue;
-
-    if (
-      (src === 'английский' && tgt === 'русский') ||
-      (src === 'русский' && tgt === 'английский')
-    ) {
-      wordPairs.push({
-        english: src === 'английский' ? srcTxt : tgtTxt,
-        russian: src === 'русский' ? srcTxt : tgtTxt
-      });
-    }
-  }
-
-  if (wordPairs.length === 0) {
-    alert('لا توجد كلمات إنجليزية-روسية في الملف!');
-    return;
-  }
-
-  console.log(`تم تحميل ${wordPairs.length} زوجًا من الكلمات.`);
-
+  
+  // Initialize game elements first
   initializeGame();
+  
+  // Use default data directly to ensure game works
+  if (!table || table.getRowCount() === 0) {
+    console.log('Using default data');
+    wordPairs = [
+      { english: 'hello', russian: 'привет' },
+      { english: 'house', russian: 'дом' },
+      { english: 'cat', russian: 'кошка' },
+      { english: 'dog', russian: 'собака' },
+      { english: 'book', russian: 'книга' },
+      { english: 'water', russian: 'вода' },
+      { english: 'fire', russian: 'огонь' },
+      { english: 'sun', russian: 'солнце' },
+      { english: 'moon', russian: 'луна' },
+      { english: 'tree', russian: 'дерево' }
+    ];
+    
+    wordDisplayElement.html(`${wordPairs.length} default words loaded. Enter your name and start!`);
+    startButton.show(); // Make sure start button is visible
+  } else {
+    loadAndProcessData();
+  }
 }
 
 function initializeGame() {
@@ -68,8 +63,10 @@ function initializeGame() {
   backToGameButton = select('#back-to-game-btn');
   playerNameInput = select('#player-name');
 
-  wordDisplayElement.html('Click "Start Game" to begin');
+  // Show loading message
+  wordDisplayElement.html('Setting up game...');
 
+  // Setup start button event
   startButton.mousePressed(() => {
     const playerName = playerNameInput.value().trim();
     if (!playerName) {
@@ -79,12 +76,73 @@ function initializeGame() {
     initGame();
   });
 
-  leaderboardButton.mousePressed(() => showLeaderboard(leaderboardBody));
-  clearLeaderboardButton.mousePressed(clearLeaderboard);
-  backToGameButton.mousePressed(backToGame);
+  // Setup other button events
+  if (leaderboardButton) leaderboardButton.mousePressed(() => showLeaderboard(leaderboardBody));
+  if (clearLeaderboardButton) clearLeaderboardButton.mousePressed(clearLeaderboard);
+  if (backToGameButton) backToGameButton.mousePressed(backToGame);
 }
 
+function loadAndProcessData() {
+  wordPairs = [];
+  
+  if (!table || table.getRowCount() === 0) {
+    console.warn('Table is empty');
+    return;
+  }
+
+  console.log(`Rows in file: ${table.getRowCount()}`);
+  
+  for (let i = 0; i < table.getRowCount(); i++) {
+    try {
+      const row = table.getRow(i);
+      
+      // Read data safely
+      const src = row.get('source_lang') || row.get(0);
+      const tgt = row.get('target_lang') || row.get(1);
+      const srcTxt = row.get('source_text') || row.get(2);
+      const tgtTxt = row.get('target_text') || row.get(3);
+      
+      if (src && tgt && srcTxt && tgtTxt) {
+        const srcStr = String(src).trim();
+        const tgtStr = String(tgt).trim();
+        const srcTxtStr = String(srcTxt).trim();
+        const tgtTxtStr = String(tgtTxt).trim();
+        
+        if ((srcStr === 'английский' && tgtStr === 'русский') ||
+            (srcStr === 'русский' && tgtStr === 'английский')) {
+          wordPairs.push({
+            english: srcStr === 'английский' ? srcTxtStr : tgtTxtStr,
+            russian: srcStr === 'русский' ? srcTxtStr : tgtTxtStr
+          });
+        }
+      }
+    } catch (error) {
+      console.warn(`Error in row ${i}:`, error);
+    }
+  }
+
+  if (wordPairs.length === 0) {
+    console.warn('No words loaded from file');
+  } else {
+    console.log(`${wordPairs.length} words loaded from file`);
+    wordDisplayElement.html(`${wordPairs.length} words loaded. Enter your name and start!`);
+  }
+}
+
+// Remaining functions stay the same with minimal changes
 function initGame() {
+  if (wordPairs.length === 0) {
+    alert('No words available. Using default data.');
+    // Add some default words if array is empty
+    if (wordPairs.length === 0) {
+      wordPairs = [
+        { english: 'hello', russian: 'привет' },
+        { english: 'goodbye', russian: 'до свидания' },
+        { english: 'thank you', russian: 'спасибо' }
+      ];
+    }
+  }
+  
   score = 0;
   timeLeft = 60;
   currentWordIndex = 0;
@@ -93,8 +151,12 @@ function initGame() {
   scoreElement.html(`Score: ${score}`);
   timerElement.html(timeLeft);
   startButton.html("Restart Game");
-  select('#name-input').style('display', 'none');
-  select('#game-screen').removeClass('hidden');
+  
+  // Hide/show elements
+  const nameInput = select('#name-input');
+  const gameScreen = select('#game-screen');
+  if (nameInput) nameInput.style('display', 'none');
+  if (gameScreen) gameScreen.removeClass('hidden');
 
   showNextWord();
   startTimer();
@@ -104,7 +166,7 @@ function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     timeLeft--;
-    timerElement.html(timeLeft);
+    if (timerElement) timerElement.html(timeLeft);
     if (timeLeft <= 0) {
       endGame();
     }
@@ -112,6 +174,8 @@ function startTimer() {
 }
 
 function showNextWord() {
+  if (!gameActive || wordPairs.length === 0) return;
+  
   if (currentWordIndex >= wordPairs.length) {
     shuffleArray(wordPairs);
     currentWordIndex = 0;
@@ -120,21 +184,28 @@ function showNextWord() {
   const currentPair = wordPairs[currentWordIndex];
   currentDirection = random() > 0.5 ? "en-ru" : "ru-en";
 
-  wordDisplayElement.html(
-    currentDirection === "en-ru" ? currentPair.english : currentPair.russian
-  );
+  if (wordDisplayElement) {
+    wordDisplayElement.html(
+      currentDirection === "en-ru" ? currentPair.english : currentPair.russian
+    );
+  }
 
   createOptions(currentPair);
 }
 
 function createOptions(correctPair) {
+  if (!optionsContainerElement) return;
+  
   optionsContainerElement.html('');
 
   const wrongOptions = [];
-  while (wrongOptions.length < 3) {
+  const usedIndices = new Set([currentWordIndex]);
+
+  while (wrongOptions.length < 3 && usedIndices.size < wordPairs.length) {
     const randIdx = floor(random(wordPairs.length));
-    if (randIdx !== currentWordIndex && !wrongOptions.includes(wordPairs[randIdx])) {
+    if (!usedIndices.has(randIdx)) {
       wrongOptions.push(wordPairs[randIdx]);
+      usedIndices.add(randIdx);
     }
   }
 
@@ -170,7 +241,7 @@ function checkAnswer(isCorrect, clickedBtn) {
 
   if (isCorrect) {
     score += 10;
-    scoreElement.html(`Score: ${score}`);
+    if (scoreElement) scoreElement.html(`Score: ${score}`);
     setTimeout(() => {
       currentWordIndex++;
       showNextWord();
@@ -182,21 +253,35 @@ function checkAnswer(isCorrect, clickedBtn) {
 
 function endGame() {
   gameActive = false;
-  clearInterval(timerInterval);
+  if (timerInterval) clearInterval(timerInterval);
+  
   saveScore();
-  wordDisplayElement.html(`Game Over! Final Score: ${score}`);
-  optionsContainerElement.html('');
-  createButton('View Leaderboard')
-    .parent(optionsContainerElement)
-    .mousePressed(() => showLeaderboard(select('#leaderboard-body')));
-  select('#name-input').style('display', 'block');
-  select('#game-screen').addClass('hidden');
+  
+  if (wordDisplayElement) wordDisplayElement.html(`Game Over! Final Score: ${score}`);
+  if (optionsContainerElement) {
+    optionsContainerElement.html('');
+    
+    const leaderboardBtn = createButton('Show Leaderboard');
+    leaderboardBtn.parent(optionsContainerElement);
+    leaderboardBtn.mousePressed(() => {
+      showLeaderboard(select('#leaderboard-body'));
+    });
+  }
+  
+  const nameInput = select('#name-input');
+  const gameScreen = select('#game-screen');
+  if (nameInput) nameInput.style('display', 'block');
+  if (gameScreen) gameScreen.addClass('hidden');
 }
 
 function saveScore() {
-  const playerName = playerNameInput.value().trim() || 'Player';
+  const playerName = (playerNameInput && playerNameInput.value().trim()) || 'Player';
   let leaderboard = getLeaderboard();
-  leaderboard.push({ name: playerName, score, date: new Date().toLocaleDateString() });
+  leaderboard.push({ 
+    name: playerName, 
+    score: score, 
+    date: new Date().toLocaleDateString() 
+  });
   leaderboard.sort((a, b) => b.score - a.score);
   if (leaderboard.length > 10) leaderboard.pop();
   localStorage.setItem('wordGameLeaderboard', JSON.stringify(leaderboard));
@@ -204,47 +289,70 @@ function saveScore() {
 
 function getLeaderboard() {
   const data = localStorage.getItem('wordGameLeaderboard');
-  return data ? JSON.parse(data) : [];
+  try {
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error('Error reading leaderboard:', error);
+    return [];
+  }
 }
 
 function showLeaderboard(leaderboardBody) {
-  select('#game-screen').addClass('hidden');
-  select('#leaderboard-screen').removeClass('hidden');
+  const gameScreen = select('#game-screen');
+  const leaderboardScreen = select('#leaderboard-screen');
+  
+  if (gameScreen) gameScreen.addClass('hidden');
+  if (leaderboardScreen) leaderboardScreen.removeClass('hidden');
+  
+  if (!leaderboardBody) return;
+  
   leaderboardBody.html('');
 
   const leaderboard = getLeaderboard();
   if (leaderboard.length === 0) {
     const row = createElement('tr');
-    row.child(createElement('td', 'No scores yet').attribute('colspan', '4'));
+    const cell = createElement('td', 'No results yet');
+    cell.attribute('colspan', '4');
+    row.child(cell);
     leaderboardBody.child(row);
   } else {
     leaderboard.forEach((entry, i) => {
+      if (!entry) return;
+      
       const row = createElement('tr');
       row.child(createElement('td', (i + 1).toString()));
-      row.child(createElement('td', entry.name));
-      row.child(createElement('td', entry.score.toString()));
-      row.child(createElement('td', entry.date));
+      row.child(createElement('td', entry.name || 'Unknown'));
+      row.child(createElement('td', entry.score ? entry.score.toString() : '0'));
+      row.child(createElement('td', entry.date || 'Unknown date'));
       leaderboardBody.child(row);
     });
   }
 }
 
 function clearLeaderboard() {
-  if (confirm('Are you sure you want to clear the leaderboard?')) {
-    localStorage.removeItem('wordGameLeaderboard');
-    showLeaderboard(select('#leaderboard-body'));
+  if (confirm("Are you sure you want to clear the leaderboard?")) {
+    localStorage.removeItem("wordGameLeaderboard");
+    showLeaderboard(select("#leaderboard-body"));
   }
 }
 
 function backToGame() {
-  select('#leaderboard-screen').addClass('hidden');
-  select('#game-screen').removeClass('hidden');
-  select('#name-input').style('display', 'block');
+  const leaderboardScreen = select("#leaderboard-screen");
+  const gameScreen = select("#game-screen");
+  const nameInput = select("#name-input");
+  
+  if (leaderboardScreen) leaderboardScreen.addClass("hidden");
+  if (gameScreen) gameScreen.removeClass("hidden");
+  if (nameInput) nameInput.style('display', 'block');
 }
 
 function shuffleArray(array) {
+  if (!array || array.length === 0) {
+    return array;
+  }
+  
   for (let i = array.length - 1; i > 0; i--) {
-    const j = floor(random(i + 1));
+    const j = Math.floor(random(i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
